@@ -36,6 +36,7 @@ if not TOKEN:
 DB_FILE = "database.json"
 PREFIX_FILE = "prefixes.json"
 NO_PREFIX_FILE = "noprefix.json"
+CHANNELS_FILE = "channels.json"
 
 START_BALANCE = 1000
 DAILY_REWARD = 1000
@@ -48,6 +49,21 @@ LOAN_DUE_SECONDS = 2 * 24 * 60 * 60
 OWNER_IDS = [
     1396844211038458018
 ]
+def load_channels():
+
+    if not os.path.exists(CHANNELS_FILE):
+
+        with open(CHANNELS_FILE, "w") as f:
+            json.dump({}, f)
+
+    with open(CHANNELS_FILE, "r") as f:
+        return json.load(f)
+
+
+def save_channels(data):
+
+    with open(CHANNELS_FILE, "w") as f:
+        json.dump(data, f, indent=4)
 
 # =========================
 # BOT
@@ -305,7 +321,7 @@ def create_view(title, sections=None):
 
     items.append(
         ui.TextDisplay(
-            "-# Vaultrix Casino • Components V2 • No embeds"
+            "-# Vaultrix Casino • made by odxbrosky"
         )
     )
 
@@ -315,7 +331,35 @@ def create_view(title, sections=None):
 
     return view
 
+async def check_channel(ctx):
 
+    if ctx.author.id in OWNER_IDS:
+        return True
+
+    data = load_channels()
+
+    guild_id = str(ctx.guild.id)
+
+    if guild_id not in data:
+        return True
+
+    allowed_channel = data[guild_id]
+
+    if ctx.channel.id != allowed_channel:
+
+        await ctx.send(
+            view=create_view(
+                "🚫 Wrong Channel",
+                [
+                    f"Use bot commands in <#{allowed_channel}> only."
+                ]
+            ),
+            delete_after=5
+        )
+
+        return False
+
+    return True
 # =========================
 # HELP VIEW
 # =========================
@@ -640,6 +684,8 @@ async def on_ready():
 
 @bot.hybrid_command(name="help")
 async def help_cmd(ctx):
+    if not await check_channel(ctx):
+        return
 
     await ctx.send(
         view=HelpView(
@@ -654,6 +700,8 @@ async def help_cmd(ctx):
 
 @bot.hybrid_command(name="balance", aliases=["bal"])
 async def balance(ctx):
+    if not await check_channel(ctx):
+        return
 
     user = get_user(ctx.author.id)
 
@@ -797,6 +845,8 @@ async def coinflip(
     amount: int,
     side: str = "h"
 ):
+    if not await check_channel(ctx):
+        return
     if await block_if_loan_overdue(ctx):
         return
 
@@ -952,6 +1002,8 @@ async def coinflip(
 
 @bot.hybrid_command(name="slots", aliases=["s"])
 async def slots(ctx, amount: int):
+    if not await check_channel(ctx):
+        return
     if await block_if_loan_overdue(ctx):
         return
     user = get_user(ctx.author.id)
@@ -1563,6 +1615,8 @@ class BlackjackView(ui.LayoutView):
         )
 @bot.hybrid_command(name="blackjack", aliases=["bj"])
 async def blackjack(ctx, amount: int):
+    if not await check_channel(ctx):
+        return
     if await block_if_loan_overdue(ctx):
         return
 
@@ -1852,6 +1906,8 @@ class MinesView(ui.LayoutView):
         )
 @bot.hybrid_command(name="mines", aliases=['m'])
 async def mines(ctx, amount: int):
+    if not await check_channel(ctx):
+        return
     if await block_if_loan_overdue(ctx):
         return
 
@@ -1898,6 +1954,8 @@ async def mines(ctx, amount: int):
     )
 @bot.hybrid_command(name="crash")
 async def crash(ctx, amount: int, cashout: float = 2.0):
+    if not await check_channel(ctx):
+        return
     if await block_if_loan_overdue(ctx):
         return
     user = get_user(ctx.author.id)
@@ -2048,6 +2106,8 @@ class TowerView(ui.LayoutView):
 
 @bot.hybrid_command(name="tower")
 async def tower(ctx, amount: int):
+    if not await check_channel(ctx):
+        return
     if await block_if_loan_overdue(ctx):
         return
     user = get_user(ctx.author.id)
@@ -2410,6 +2470,63 @@ async def interest(ctx):
             ]
         )
     )
+@bot.hybrid_command(name="setchannel")
+async def setchannel(ctx, channel: discord.TextChannel):
+
+    if ctx.author.id not in OWNER_IDS:
+
+        return await ctx.send(
+            view=create_view(
+                "❌ Owner Only",
+                [
+                    "Only bot owners can set the bot channel."
+                ]
+            )
+        )
+
+    data = load_channels()
+
+    data[str(ctx.guild.id)] = channel.id
+
+    save_channels(data)
+
+    await ctx.send(
+        view=create_view(
+            "📌 Bot Channel Set",
+            [
+                f"Bot commands are now restricted to {channel.mention}."
+            ]
+        )
+    )
+@bot.hybrid_command(name="removechannel")
+async def removechannel(ctx):
+
+    if ctx.author.id not in OWNER_IDS:
+
+        return await ctx.send(
+            view=create_view(
+                "❌ Owner Only",
+                [
+                    "Only bot owners can remove the bot channel."
+                ]
+            )
+        )
+
+    data = load_channels()
+
+    if str(ctx.guild.id) in data:
+        del data[str(ctx.guild.id)]
+
+    save_channels(data)
+
+    await ctx.send(
+        view=create_view(
+            "♻️ Channel Restriction Removed",
+            [
+                "Bot can now be used in all channels."
+            ]
+        )
+    ) 
 # =========================
 # RUN
 # =========================
