@@ -512,6 +512,14 @@ class HelpView(ui.LayoutView):
                 f"`{p}debt` — check debt\n"
                 f"`{p}paytax` — pay tax\n"
                 f"`{p}interest` — claim hourly bank interest\n"
+                f"`{p}inventory` / `{p}inv` — view inventory\n"
+                f"`{p}crate basic/void` — open loot crates\n"
+                f"`{p}petshop` — view pets\n"
+                f"`{p}petbuy <pet>` — buy pet\n"
+                f"`{p}business` — view businesses\n"
+                f"`{p}buybusiness <id>` — buy business\n"
+                f"`{p}collect` — collect passive income\n"
+                f"`{p}roulette <amount> red/black/green` — animated roulette\n"
             ]
         )
 
@@ -552,7 +560,7 @@ class HelpView(ui.LayoutView):
                 f"`{p}history` — transaction history\n"
                 f"`{p}stats` — player stats\n"
                 f"`{p}shop` — shop menu\n"
-                f"`{p}petshop` — pet shop"
+                f"`{p}petshop` — pet shop\n"
             ]
         )
 
@@ -2842,7 +2850,501 @@ async def removecoins(
                 f"New Wallet Balance: 🪙 `{user['wallet']}`"
             ]
         )
-    ) 
+    )# =========================
+# INVENTORY / PETS / BUSINESS / CRATES / ROULETTE
+# =========================
+
+CRATES = {
+    "basic": {
+        "price": 1000,
+        "rewards": [
+            ("coins", 500),
+            ("coins", 1500),
+            ("item", "Lucky Charm"),
+            ("pet", "Cyber Cat"),
+            ("badge", "📦 Crate Opener")
+        ]
+    },
+    "void": {
+        "price": 5000,
+        "rewards": [
+            ("coins", 3000),
+            ("coins", 10000),
+            ("item", "Void Token"),
+            ("pet", "Void Dragon"),
+            ("badge", "🌌 Void Blessed")
+        ]
+    }
+}
+
+PETS = {
+    "cybercat": {
+        "name": "Cyber Cat",
+        "price": 3000,
+        "boost": "work"
+    },
+    "voiddragon": {
+        "name": "Void Dragon",
+        "price": 10000,
+        "boost": "casino"
+    },
+    "crimsonfox": {
+        "name": "Crimson Fox",
+        "price": 6000,
+        "boost": "interest"
+    }
+}
+
+BUSINESSES = {
+    "lemonade": {
+        "name": "Lemonade Stand",
+        "price": 5000,
+        "income": 500
+    },
+    "arcade": {
+        "name": "Casino Arcade",
+        "price": 15000,
+        "income": 1800
+    },
+    "club": {
+        "name": "Neon Nightclub",
+        "price": 50000,
+        "income": 6500
+    }
+}
+
+BUSINESS_COOLDOWN = 3600
+
+
+def ensure_extra_fields(user):
+    if "inventory" not in user:
+        user["inventory"] = []
+
+    if "pets" not in user:
+        user["pets"] = []
+
+    if "badges" not in user:
+        user["badges"] = []
+
+    if "businesses" not in user:
+        user["businesses"] = []
+
+    if "last_business_collect" not in user:
+        user["last_business_collect"] = 0
+
+
+@bot.hybrid_command(name="inventory", aliases=["inv"])
+async def inventory(ctx):
+    if not await check_channel(ctx):
+        return
+
+    user = get_user(ctx.author.id)
+    ensure_extra_fields(user)
+
+    items = "\n".join(user["inventory"]) if user["inventory"] else "No items yet."
+    pets = "\n".join(user["pets"]) if user["pets"] else "No pets yet."
+    badges = "\n".join(user["badges"]) if user["badges"] else "No badges yet."
+
+    await ctx.send(
+        view=create_view(
+            "🎒 Inventory",
+            [
+                f"**Items:**\n{items}",
+                f"**Pets:**\n{pets}",
+                f"**Badges:**\n{badges}"
+            ]
+        )
+    )
+
+
+@bot.hybrid_command(name="crate")
+async def crate(ctx, crate_type: str = "basic"):
+    if not await check_channel(ctx):
+        return
+
+    crate_type = crate_type.lower()
+
+    if crate_type not in CRATES:
+        return await ctx.send(
+            view=create_view(
+                "❌ Crate Not Found",
+                ["Available crates: `basic`, `void`"]
+            )
+        )
+
+    user = get_user(ctx.author.id)
+    ensure_extra_fields(user)
+
+    crate_data = CRATES[crate_type]
+    price = crate_data["price"]
+
+    if user["wallet"] < price:
+        return await ctx.send(
+            view=create_view(
+                "❌ Not Enough Coins",
+                [f"This crate costs 🪙 `{price}`."]
+            )
+        )
+
+    user["wallet"] -= price
+    update_user(ctx.author.id, user)
+
+    msg = await ctx.send(
+        view=create_view(
+            "📦 Opening Crate",
+            [f"Opening `{crate_type}` crate..."]
+        )
+    )
+
+    for icon in ["📦", "✨", "💎", "🎁", "🌌"]:
+        await msg.edit(
+            view=create_view(
+                "📦 Opening Crate",
+                [f"Rolling reward... {icon}"]
+            )
+        )
+        await asyncio.sleep(0.4)
+
+    reward_type, reward_value = random.choice(crate_data["rewards"])
+    user = get_user(ctx.author.id)
+    ensure_extra_fields(user)
+
+    if reward_type == "coins":
+        user["wallet"] += reward_value
+        text = f"You won 🪙 `{reward_value}` coins."
+
+    elif reward_type == "item":
+        user["inventory"].append(reward_value)
+        text = f"You got item: **{reward_value}**"
+
+    elif reward_type == "pet":
+        if reward_value not in user["pets"]:
+            user["pets"].append(reward_value)
+        text = f"You got pet: **{reward_value}**"
+
+    elif reward_type == "badge":
+        if reward_value not in user["badges"]:
+            user["badges"].append(reward_value)
+        text = f"You unlocked badge: {reward_value}"
+
+    update_user(ctx.author.id, user)
+
+    await msg.edit(
+        view=create_view(
+            "🎁 Crate Opened",
+            [
+                text,
+                f"Wallet: 🪙 `{user['wallet']}`"
+            ]
+        )
+    )
+
+
+@bot.hybrid_command(name="petshop")
+async def petshop(ctx):
+    if not await check_channel(ctx):
+        return
+
+    text = ""
+
+    for key, pet in PETS.items():
+        text += (
+            f"`{key}` — **{pet['name']}**\n"
+            f"Price: 🪙 `{pet['price']}`\n"
+            f"Boost: `{pet['boost']}`\n\n"
+        )
+
+    await ctx.send(
+        view=create_view(
+            "🐾 Pet Shop",
+            [
+                text,
+                "Buy using `petbuy <pet_id>`"
+            ]
+        )
+    )
+
+
+@bot.hybrid_command(name="petbuy")
+async def petbuy(ctx, pet_id: str):
+    if not await check_channel(ctx):
+        return
+
+    pet_id = pet_id.lower()
+
+    if pet_id not in PETS:
+        return await ctx.send(
+            view=create_view(
+                "❌ Pet Not Found",
+                ["Use `petshop` to see pets."]
+            )
+        )
+
+    user = get_user(ctx.author.id)
+    ensure_extra_fields(user)
+
+    pet = PETS[pet_id]
+
+    if user["wallet"] < pet["price"]:
+        return await ctx.send(
+            view=create_view(
+                "❌ Not Enough Coins",
+                [f"You need 🪙 `{pet['price']}`."]
+            )
+        )
+
+    if pet["name"] in user["pets"]:
+        return await ctx.send(
+            view=create_view(
+                "❌ Already Owned",
+                ["You already own this pet."]
+            )
+        )
+
+    user["wallet"] -= pet["price"]
+    user["pets"].append(pet["name"])
+
+    update_user(ctx.author.id, user)
+
+    await ctx.send(
+        view=create_view(
+            "🐾 Pet Purchased",
+            [
+                f"You bought **{pet['name']}**.",
+                f"Boost Type: `{pet['boost']}`"
+            ]
+        )
+    )
+
+
+@bot.hybrid_command(name="business")
+async def business(ctx):
+    if not await check_channel(ctx):
+        return
+
+    text = ""
+
+    for key, biz in BUSINESSES.items():
+        text += (
+            f"`{key}` — **{biz['name']}**\n"
+            f"Price: 🪙 `{biz['price']}`\n"
+            f"Hourly Income: 🪙 `{biz['income']}`\n\n"
+        )
+
+    await ctx.send(
+        view=create_view(
+            "🏢 Businesses",
+            [
+                text,
+                "Buy using `buybusiness <business_id>`",
+                "Collect income using `collect`"
+            ]
+        )
+    )
+
+
+@bot.hybrid_command(name="buybusiness")
+async def buybusiness(ctx, business_id: str):
+    if not await check_channel(ctx):
+        return
+
+    business_id = business_id.lower()
+
+    if business_id not in BUSINESSES:
+        return await ctx.send(
+            view=create_view(
+                "❌ Business Not Found",
+                ["Use `business` to see businesses."]
+            )
+        )
+
+    user = get_user(ctx.author.id)
+    ensure_extra_fields(user)
+
+    biz = BUSINESSES[business_id]
+
+    if user["wallet"] < biz["price"]:
+        return await ctx.send(
+            view=create_view(
+                "❌ Not Enough Coins",
+                [f"You need 🪙 `{biz['price']}`."]
+            )
+        )
+
+    if business_id in user["businesses"]:
+        return await ctx.send(
+            view=create_view(
+                "❌ Already Owned",
+                ["You already own this business."]
+            )
+        )
+
+    user["wallet"] -= biz["price"]
+    user["businesses"].append(business_id)
+
+    update_user(ctx.author.id, user)
+
+    await ctx.send(
+        view=create_view(
+            "🏢 Business Purchased",
+            [
+                f"You bought **{biz['name']}**.",
+                f"Hourly Income: 🪙 `{biz['income']}`"
+            ]
+        )
+    )
+
+
+@bot.hybrid_command(name="collect")
+async def collect(ctx):
+    if not await check_channel(ctx):
+        return
+
+    user = get_user(ctx.author.id)
+    ensure_extra_fields(user)
+
+    if not user["businesses"]:
+        return await ctx.send(
+            view=create_view(
+                "❌ No Businesses",
+                ["Buy a business first using `business`."]
+            )
+        )
+
+    now = int(time.time())
+
+    if now - user["last_business_collect"] < BUSINESS_COOLDOWN:
+        left = BUSINESS_COOLDOWN - (now - user["last_business_collect"])
+
+        return await ctx.send(
+            view=create_view(
+                "⏳ Business Cooldown",
+                [f"Collect again in `{left // 60}m {left % 60}s`."]
+            )
+        )
+
+    earned = 0
+
+    for biz_id in user["businesses"]:
+        earned += BUSINESSES[biz_id]["income"]
+
+    user["wallet"] += earned
+    user["last_business_collect"] = now
+
+    update_user(ctx.author.id, user)
+
+    await ctx.send(
+        view=create_view(
+            "💰 Business Income Collected",
+            [
+                f"Earned: 🪙 `{earned}`",
+                f"Wallet: 🪙 `{user['wallet']}`"
+            ]
+        )
+    )
+
+
+@bot.hybrid_command(name="roulette", aliases=["rl"])
+async def roulette(ctx, amount: int, color: str = "red"):
+    if not await check_channel(ctx):
+        return
+
+    if await block_if_loan_overdue(ctx):
+        return
+
+    color = color.lower()
+
+    if color not in ["red", "black", "green"]:
+        return await ctx.send(
+            view=create_view(
+                "❌ Invalid Color",
+                ["Choose `red`, `black`, or `green`."]
+            )
+        )
+
+    user = get_user(ctx.author.id)
+
+    if amount <= 0 or amount > MAX_BET or user["wallet"] < amount:
+        return await ctx.send(
+            view=create_view(
+                "❌ Invalid Bet",
+                ["Check amount, max bet, or wallet balance."]
+            )
+        )
+
+    msg = await ctx.send(
+        view=create_view(
+            "🎡 Roulette Spinning",
+            [
+                f"Bet: 🪙 `{amount}`",
+                f"Choice: `{color}`",
+                "🔴 ⚫ 🔴 ⚫ 🟢 ⚫ 🔴"
+            ]
+        )
+    )
+
+    wheel = [
+        "🔴", "⚫", "🔴", "⚫", "🟢", "⚫", "🔴", "⚫"
+    ]
+
+    for i in range(10):
+        random.shuffle(wheel)
+
+        await msg.edit(
+            view=create_view(
+                "🎡 Roulette Spinning",
+                [
+                    f"Bet: 🪙 `{amount}`",
+                    f"Choice: `{color}`",
+                    " ".join(wheel)
+                ]
+            )
+        )
+
+        await asyncio.sleep(0.25)
+
+    result = random.choices(
+        ["red", "black", "green"],
+        weights=[47, 47, 6],
+        k=1
+    )[0]
+
+    emoji = {
+        "red": "🔴",
+        "black": "⚫",
+        "green": "🟢"
+    }[result]
+
+    if color == result:
+        if result == "green":
+            reward = amount * 10
+        else:
+            reward = amount
+
+        user["wallet"] += reward
+        user["wins"] += 1
+        user["profit"] += reward
+        text = f"✅ You won 🪙 `{reward}`!"
+
+    else:
+        user["wallet"] -= amount
+        user["losses"] += 1
+        user["profit"] -= amount
+        text = f"❌ You lost 🪙 `{amount}`."
+
+    update_user(ctx.author.id, user)
+
+    await msg.edit(
+        view=create_view(
+            "🎡 Roulette Result",
+            [
+                f"Result: {emoji} **{result.upper()}**",
+                text,
+                f"Balance: 🪙 `{user['wallet']}`"
+            ]
+        )
+    )
+ 
 # =========================
 # RUN
 # =========================
