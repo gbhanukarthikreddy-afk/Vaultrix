@@ -2791,6 +2791,57 @@ async def removechannel(ctx):
                 "Bot can now be used in all channels."
             ]
         )
+    )
+@bot.hybrid_command(name="removecoins")
+async def removecoins(
+    ctx,
+    member: discord.Member,
+    amount: int
+):
+
+    if ctx.author.id not in OWNER_IDS:
+
+        return await ctx.send(
+            view=create_view(
+                "❌ Owner Only",
+                [
+                    "Only bot owners can use this command."
+                ]
+            )
+        )
+
+    if amount <= 0:
+
+        return await ctx.send(
+            view=create_view(
+                "❌ Invalid Amount",
+                [
+                    "Amount must be above `0`."
+                ]
+            )
+        )
+
+    user = get_user(member.id)
+
+    removed = min(amount, user["wallet"])
+
+    user["wallet"] -= removed
+
+    update_user(member.id, user)
+
+    add_history(
+        member.id,
+        f"{removed} coins removed by owner"
+    )
+
+    await ctx.send(
+        view=create_view(
+            "💸 Coins Removed",
+            [
+                f"Removed 🪙 `{removed}` coins from {member.mention}",
+                f"New Wallet Balance: 🪙 `{user['wallet']}`"
+            ]
+        )
     ) 
 # =========================
 # RUN
