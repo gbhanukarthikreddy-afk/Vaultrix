@@ -39,6 +39,7 @@ NO_PREFIX_FILE = "noprefix.json"
 CHANNELS_FILE = "channels.json"
 
 START_BALANCE = 1000
+DAILY_COOLDOWN = 24 * 60 * 60  # 24 hours
 DAILY_REWARD = 1000
 MAX_BET = 250000
 WORK_COOLDOWN = 300  # 5 minutes
@@ -737,20 +738,48 @@ async def balance(ctx, member: discord.Member = None):
 
 @bot.hybrid_command(name="daily")
 async def daily(ctx):
-
-    amount = random.randint(100, 1000)
+    if not await check_channel(ctx):
+        return
 
     user = get_user(ctx.author.id)
 
+    if "last_daily" not in user:
+        user["last_daily"] = 0
+
+    now = int(time.time())
+
+    if now - user["last_daily"] < DAILY_COOLDOWN:
+        left = DAILY_COOLDOWN - (now - user["last_daily"])
+
+        hours = left // 3600
+        minutes = (left % 3600) // 60
+        seconds = left % 60
+
+        return await ctx.send(
+            view=create_view(
+                "⏳ Daily Cooldown",
+                [
+                    f"You already claimed your daily reward.",
+                    f"Come back in `{hours}h {minutes}m {seconds}s`."
+                ]
+            )
+        )
+
+    amount = DAILY_REWARD
+
     user["wallet"] += amount
+    user["last_daily"] = now
 
     update_user(ctx.author.id, user)
+    add_history(ctx.author.id, f"Claimed daily {amount} coins")
 
     await ctx.send(
         view=create_view(
             "🎁 Daily Reward",
             [
-                f"You received 🪙 `{amount}` coins."
+                f"You received 🪙 `{amount}` coins.",
+                f"Next daily in: `24 hours`",
+                f"Wallet: 🪙 `{user['wallet']}`"
             ]
         )
     )
