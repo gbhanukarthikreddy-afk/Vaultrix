@@ -41,6 +41,7 @@ CHANNELS_FILE = "channels.json"
 START_BALANCE = 1000
 DAILY_REWARD = 1000
 MAX_BET = 250000
+WORK_COOLDOWN = 300  # 5 minutes
 LOAN_LIMIT = 100000
 LOAN_INTEREST_RATE = 0.10
 LOAN_OVERDUE_PENALTY = 0.10
@@ -760,6 +761,27 @@ async def daily(ctx):
 
 @bot.hybrid_command(name="work")
 async def work(ctx):
+    if not await check_channel(ctx):
+        return
+
+    user = get_user(ctx.author.id)
+
+    if "last_work" not in user:
+        user["last_work"] = 0
+
+    now = int(time.time())
+
+    if now - user["last_work"] < WORK_COOLDOWN:
+        left = WORK_COOLDOWN - (now - user["last_work"])
+
+        return await ctx.send(
+            view=create_view(
+                "⏳ Work Cooldown",
+                [
+                    f"You can work again in `{left // 60}m {left % 60}s`."
+                ]
+            )
+        )
 
     jobs = [
         "Vault Guard",
@@ -769,12 +791,10 @@ async def work(ctx):
     ]
 
     job = random.choice(jobs)
-
     pay = random.randint(200, 1500)
 
-    user = get_user(ctx.author.id)
-
     user["wallet"] += pay
+    user["last_work"] = now
 
     update_user(ctx.author.id, user)
 
@@ -783,7 +803,66 @@ async def work(ctx):
             "💼 Work Complete",
             [
                 f"Job: **{job}**",
-                f"Earned: 🪙 `{pay}`"
+                f"Earned: 🪙 `{pay}`",
+                f"Next work in: `5 minutes`"
+            ]
+        )
+    )
+@bot.hybrid_command(name="give")
+async def give(ctx, member: discord.Member, amount: int):
+    if not await check_channel(ctx):
+        return
+
+    if member.bot:
+        return await ctx.send(
+            view=create_view(
+                "❌ Invalid User",
+                ["You cannot give coins to a bot."]
+            )
+        )
+
+    if member.id == ctx.author.id:
+        return await ctx.send(
+            view=create_view(
+                "❌ Invalid Transfer",
+                ["You cannot give coins to yourself."]
+            )
+        )
+
+    if amount <= 0:
+        return await ctx.send(
+            view=create_view(
+                "❌ Invalid Amount",
+                ["Amount must be above `0`."]
+            )
+        )
+
+    sender = get_user(ctx.author.id)
+    receiver = get_user(member.id)
+
+    if sender["wallet"] < amount:
+        return await ctx.send(
+            view=create_view(
+                "❌ Not Enough Coins",
+                ["You don't have enough wallet coins."]
+            )
+        )
+
+    sender["wallet"] -= amount
+    receiver["wallet"] += amount
+
+    update_user(ctx.author.id, sender)
+    update_user(member.id, receiver)
+
+    add_history(ctx.author.id, f"Gave {amount} coins to {member}")
+    add_history(member.id, f"Received {amount} coins from {ctx.author}")
+
+    await ctx.send(
+        view=create_view(
+            "💸 Transfer Complete",
+            [
+                f"{ctx.author.mention} gave {member.mention} 🪙 `{amount}` coins.",
+                f"Your Wallet: 🪙 `{sender['wallet']}`"
             ]
         )
     )
