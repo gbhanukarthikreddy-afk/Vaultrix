@@ -109,10 +109,17 @@ def get_prefix(bot, message):
     guild_id = str(message.guild.id) if message.guild else "dm"
     server_prefix = prefixes.get(guild_id, PREFIX)
 
-    if message.author and message.author.id in no_prefix_users:
-        return commands.when_mentioned_or(server_prefix, "")(bot, message)
+    prefix_list = [
+        server_prefix,
+        server_prefix.lower(),
+        server_prefix.upper(),
+        server_prefix.capitalize()
+    ]
 
-    return commands.when_mentioned_or(server_prefix)(bot, message)
+    if message.author and message.author.id in no_prefix_users:
+        return commands.when_mentioned_or(*prefix_list, "")(bot, message)
+
+    return commands.when_mentioned_or(*prefix_list)(bot, message)
 
 
 bot = commands.Bot(
