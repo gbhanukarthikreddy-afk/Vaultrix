@@ -578,6 +578,62 @@ async def on_ready():
 
     print(f"✅ Logged in as {bot.user}")
 
+    statuses = [
+
+        ("watching", "v!help • Vaultrix Casino"),
+        ("playing", "Mines with gamblers"),
+        ("watching", "500+ casino players"),
+        ("listening", "Coin flips"),
+        ("competing", "Jackpot battles"),
+        ("playing", "Crash & Roulette"),
+        ("watching", "Made by odxbrosky")
+
+    ]
+
+    while True:
+
+        for activity_type, text in statuses:
+
+            if activity_type == "playing":
+
+                activity = discord.Game(
+                    name=text
+                )
+
+            elif activity_type == "watching":
+
+                activity = discord.Activity(
+                    type=discord.ActivityType.watching,
+                    name=text
+                )
+
+            elif activity_type == "listening":
+
+                activity = discord.Activity(
+                    type=discord.ActivityType.listening,
+                    name=text
+                )
+
+            elif activity_type == "competing":
+
+                activity = discord.Activity(
+                    type=discord.ActivityType.competing,
+                    name=text
+                )
+
+            else:
+
+                activity = discord.Game(
+                    name=text
+                )
+
+            await bot.change_presence(
+                status=discord.Status.online,
+                activity=activity
+            )
+
+            await asyncio.sleep(5)
+
 # =========================
 # HELP
 # =========================
