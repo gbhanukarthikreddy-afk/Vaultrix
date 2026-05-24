@@ -1,0 +1,36 @@
+{
+    "1396844211038458018": {
+        "wallet": 4495,
+        "bank": 10200,
+        "last_daily": 0,
+        "last_work": 1779614503,
+        "wins": 9,
+        "losses": 4,
+        "total_bet": 1100,
+        "profit": 2328,
+        "biggest_win": 799,
+        "biggest_loss": 100,
+        "streak": 2,
+        "rank": "Gold",
+        "theme": "default",
+        "title": "Rookie Gambler",
+        "badges": [],
+        "pets": [],
+        "inventory": [],
+        "history": [
+            "18:56 \u2022 Deposited 10000 coins",
+            "18:05 \u2022 Lost 100 in blackjack",
+            "15:51 \u2022 Won 1000 in coinflip",
+            "24-05 14:52 \u2022 Won 799 coins",
+            "24-05 14:52 \u2022 Lost 100 coins",
+            "24-05 14:51 \u2022 Worked as Security Hacker and earned 608"
+        ],
+        "xp": 0,
+        "level": 1,
+        "loan": 0,
+        "loan_due": 0,
+        "loan_overdue": false,
+        "loan_penalty_added": false,
+        "last_interest": 1779629227
+    }
+}
