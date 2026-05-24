@@ -707,23 +707,29 @@ async def help_cmd(ctx):
 # =========================
 
 @bot.hybrid_command(name="balance", aliases=["bal"])
-async def balance(ctx):
+async def balance(ctx, member: discord.Member = None):
     if not await check_channel(ctx):
         return
 
-    user = get_user(ctx.author.id)
+    member = member or ctx.author
+    user = get_user(member.id)
 
     await ctx.send(
         view=create_view(
             "💰 Balance",
             [
+                f"👤 User: {member.mention}",
                 f"🪙 Wallet: `{user['wallet']}`",
                 f"🏦 Bank: `{user['bank']}`",
-                f"👑 Rank: `{user['rank']}`"
+                f"👑 Rank: `{user['rank']}`",
+                f"⭐ Level: `{user['level']}`",
+                f"✨ XP: `{user['xp']}`",
+                f"🔥 Streak: `{user['streak']}`",
+                f"🏆 Wins: `{user['wins']}`",
+                f"💀 Losses: `{user['losses']}`"
             ]
         )
     )
-
 # =========================
 # DAILY
 # =========================
