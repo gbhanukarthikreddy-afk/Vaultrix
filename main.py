@@ -118,7 +118,8 @@ def get_prefix(bot, message):
 bot = commands.Bot(
     command_prefix=get_prefix,
     intents=intents,
-    help_command=None
+    help_command=None,
+    case_insensitive=True
 )
 
 # =========================
