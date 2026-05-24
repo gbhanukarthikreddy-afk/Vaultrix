@@ -837,62 +837,205 @@ async def work(ctx):
             ]
         )
     )
+class GiveConfirmView(ui.LayoutView):
+
+    def __init__(self, sender, receiver, amount):
+        super().__init__(timeout=30)
+
+        self.sender = sender
+        self.receiver = receiver
+        self.amount = amount
+
+        confirm = ui.Button(
+            label="Confirm",
+            emoji="✅",
+            style=discord.ButtonStyle.success
+        )
+
+        cancel = ui.Button(
+            label="Cancel",
+            emoji="❌",
+            style=discord.ButtonStyle.danger
+        )
+
+        confirm.callback = self.confirm_transfer
+        cancel.callback = self.cancel_transfer
+
+        self.add_item(
+            ui.Container(
+                ui.TextDisplay(
+                    f"## 💸 Confirm Transfer\n"
+                    f"From: {sender.mention}\n"
+                    f"To: {receiver.mention}\n"
+                    f"Amount: 🪙 `{amount}`"
+                ),
+
+                ui.Separator(
+                    spacing=discord.SeparatorSpacing.large,
+                    visible=True
+                ),
+
+                ui.ActionRow(confirm, cancel),
+
+                ui.TextDisplay(
+                    "-# Vaultrix Casino • Secure Transfers"
+                )
+            )
+        )
+
+    async def interaction_check(self, interaction):
+
+        if interaction.user.id != self.sender.id:
+
+            await interaction.response.send_message(
+                "This transfer is not yours.",
+                ephemeral=True
+            )
+
+            return False
+
+        return True
+
+    async def confirm_transfer(self, interaction):
+
+        sender_data = get_user(self.sender.id)
+        receiver_data = get_user(self.receiver.id)
+
+        if sender_data["wallet"] < self.amount:
+
+            self.clear_items()
+
+            self.add_item(
+                ui.Container(
+                    ui.TextDisplay(
+                        "## ❌ Transfer Failed\n"
+                        "You no longer have enough coins."
+                    )
+                )
+            )
+
+            return await interaction.response.edit_message(
+                view=self
+            )
+
+        sender_data["wallet"] -= self.amount
+        receiver_data["wallet"] += self.amount
+
+        update_user(self.sender.id, sender_data)
+        update_user(self.receiver.id, receiver_data)
+
+        add_history(
+            self.sender.id,
+            f"Gave {self.amount} coins to {self.receiver}"
+        )
+
+        add_history(
+            self.receiver.id,
+            f"Received {self.amount} coins from {self.sender}"
+        )
+
+        self.clear_items()
+
+        self.add_item(
+            ui.Container(
+                ui.TextDisplay(
+                    f"## ✅ Transfer Complete\n"
+                    f"{self.sender.mention} gave "
+                    f"{self.receiver.mention} "
+                    f"🪙 `{self.amount}` coins."
+                ),
+
+                ui.Separator(
+                    spacing=discord.SeparatorSpacing.large,
+                    visible=True
+                ),
+
+                ui.TextDisplay(
+                    f"New Wallet Balance: "
+                    f"🪙 `{sender_data['wallet']}`"
+                )
+            )
+        )
+
+        await interaction.response.edit_message(
+            view=self
+        )
+
+    async def cancel_transfer(self, interaction):
+
+        self.clear_items()
+
+        self.add_item(
+            ui.Container(
+                ui.TextDisplay(
+                    "## ❌ Transfer Cancelled\n"
+                    "No coins were transferred."
+                )
+            )
+        )
+
+        await interaction.response.edit_message(
+            view=self
+        )
+
+
 @bot.hybrid_command(name="give")
 async def give(ctx, member: discord.Member, amount: int):
+
     if not await check_channel(ctx):
         return
 
     if member.bot:
+
         return await ctx.send(
             view=create_view(
                 "❌ Invalid User",
-                ["You cannot give coins to a bot."]
+                [
+                    "You cannot give coins to a bot."
+                ]
             )
         )
 
     if member.id == ctx.author.id:
+
         return await ctx.send(
             view=create_view(
                 "❌ Invalid Transfer",
-                ["You cannot give coins to yourself."]
+                [
+                    "You cannot give coins to yourself."
+                ]
             )
         )
 
     if amount <= 0:
+
         return await ctx.send(
             view=create_view(
                 "❌ Invalid Amount",
-                ["Amount must be above `0`."]
+                [
+                    "Amount must be above `0`."
+                ]
             )
         )
 
     sender = get_user(ctx.author.id)
-    receiver = get_user(member.id)
 
     if sender["wallet"] < amount:
+
         return await ctx.send(
             view=create_view(
                 "❌ Not Enough Coins",
-                ["You don't have enough wallet coins."]
+                [
+                    "You don't have enough wallet coins."
+                ]
             )
         )
 
-    sender["wallet"] -= amount
-    receiver["wallet"] += amount
-
-    update_user(ctx.author.id, sender)
-    update_user(member.id, receiver)
-
-    add_history(ctx.author.id, f"Gave {amount} coins to {member}")
-    add_history(member.id, f"Received {amount} coins from {ctx.author}")
-
     await ctx.send(
-        view=create_view(
-            "💸 Transfer Complete",
-            [
-                f"{ctx.author.mention} gave {member.mention} 🪙 `{amount}` coins.",
-                f"Your Wallet: 🪙 `{sender['wallet']}`"
-            ]
+        view=GiveConfirmView(
+            ctx.author,
+            member,
+            amount
         )
     )
 @bot.hybrid_command(name="deposit", aliases=["dep"])
