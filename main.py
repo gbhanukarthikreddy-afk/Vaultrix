@@ -3344,6 +3344,45 @@ async def roulette(ctx, amount: int, color: str = "red"):
             ]
         )
     )
+@bot.hybrid_command(name="rnoprefix")
+async def rnoprefix(ctx, member: discord.Member):
+
+    if ctx.author.id not in OWNER_IDS:
+
+        return await ctx.send(
+            view=create_view(
+                "❌ Owner Only",
+                [
+                    "Only bot owners can use this command."
+                ]
+            )
+        )
+
+    users = load_no_prefix_users()
+
+    if member.id not in users:
+
+        return await ctx.send(
+            view=create_view(
+                "❌ User Not Found",
+                [
+                    f"{member.mention} does not have global no prefix."
+                ]
+            )
+        )
+
+    users.remove(member.id)
+
+    save_no_prefix_users(users)
+
+    await ctx.send(
+        view=create_view(
+            "✅ No Prefix Removed",
+            [
+                f"Removed global no prefix from {member.mention}."
+            ]
+        )
+    )
  
 # =========================
 # RUN
