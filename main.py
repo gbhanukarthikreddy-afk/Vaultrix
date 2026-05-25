@@ -3383,6 +3383,75 @@ async def rnoprefix(ctx, member: discord.Member):
             ]
         )
     )
+@bot.hybrid_command(name="giftrolecoins")
+async def giftrolecoins(
+    ctx,
+    role: discord.Role,
+    amount: int
+):
+
+    if ctx.author.id not in OWNER_IDS:
+
+        return await ctx.send(
+            view=create_view(
+                "❌ Owner Only",
+                [
+                    "Only bot owners can use this command."
+                ]
+            )
+        )
+
+    if amount <= 0:
+
+        return await ctx.send(
+            view=create_view(
+                "❌ Invalid Amount",
+                [
+                    "Amount must be above `0`."
+                ]
+            )
+        )
+
+    members = [
+        member for member in role.members
+        if not member.bot
+    ]
+
+    if not members:
+
+        return await ctx.send(
+            view=create_view(
+                "❌ No Members",
+                [
+                    "This role has no members."
+                ]
+            )
+        )
+
+    for member in members:
+
+        user = get_user(member.id)
+
+        user["wallet"] += amount
+
+        update_user(member.id, user)
+
+        add_history(
+            member.id,
+            f"Received {amount} coins from role reward"
+        )
+
+    await ctx.send(
+        view=create_view(
+            "🎁 Role Coins Gifted",
+            [
+                f"Role: {role.mention}",
+                f"Members Rewarded: `{len(members)}`",
+                f"Coins Given Per User: 🪙 `{amount}`",
+                f"Total Distributed: 🪙 `{amount * len(members)}`"
+            ]
+        )
+    )
  
 # =========================
 # RUN
